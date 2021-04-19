@@ -15,7 +15,7 @@ type Config struct {
 }
 ```
 
-`Rdb` and `Expiration` are both handled by redis itself, being the redis client config and the key expiration for all keys set by `Middleware`. redis uses a value of `-1` to indicate no key expiration.
+`Rdb` and `Expiration` are both handled by redis itself, being the redis client config and the key expiration for all keys set by `Middleware`. redis uses a value of `0` to indicate no key expiration.
 
 the `Err`, `Hit`, and `Miss` callbacks are all functions called during the `Middleware` logic, corresponding to caught errors, cache hits, and cache misses respectively.
 The `next` handler will always be called in the case of an error or miss.
