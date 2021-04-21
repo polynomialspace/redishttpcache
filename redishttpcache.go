@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	servertiming "github.com/mitchellh/go-server-timing"
 )
 
 type Config struct {
@@ -56,13 +57,17 @@ func Middleware(next http.Handler, cfg *Config) http.Handler {
 			return
 		}
 
+		timing := servertiming.FromContext(r.Context())
 		cacheKey := cfg.GenCacheKey(r)
+		tCacheR := timing.NewMetric("cacheread").WithDesc("cache read").Start()
 		content, err := cfg.Rdb.Get(ctx, cacheKey).Result()
+		tCacheR.Stop()
 		switch err {
 		case redis.Nil:
 			cfg.MissCallback(r)
 			break
 		case nil:
+			tHit := timing.NewMetric("cachehit").WithDesc("cache hit").Start()
 			cfg.HitCallback(r)
 			var response Response
 			err := json.Unmarshal([]byte(content), &response)
@@ -71,6 +76,7 @@ func Middleware(next http.Handler, cfg *Config) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
+			tHit.Stop() // must be called before http w.Write()
 			err = response.WriteHTTP(w)
 			if err != nil {
 				cfg.ErrCallback(err, r)
@@ -83,6 +89,7 @@ func Middleware(next http.Handler, cfg *Config) http.Handler {
 			return
 		}
 
+		tMiss := timing.NewMetric("cachemiss").WithDesc("cache miss").Start()
 		//record and cache
 		rec := httptest.NewRecorder()
 		next.ServeHTTP(rec, r)
@@ -100,6 +107,7 @@ func Middleware(next http.Handler, cfg *Config) http.Handler {
 			cfg.ErrCallback(err, r)
 			return
 		}
+		tMiss.Stop() // must be called before http w.Write()
 		err = response.WriteHTTP(w)
 		if err != nil {
 			cfg.ErrCallback(err, r)

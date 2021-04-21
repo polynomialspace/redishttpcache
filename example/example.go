@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	servertiming "github.com/mitchellh/go-server-timing"
 	cache "github.com/polynomialspace/redishttpcache"
 )
 
@@ -20,7 +21,7 @@ func main() {
 	})
 	cachecfg := &cache.Config{
 		Rdb:        rdb,
-		Expiration: time.Second * 5,
+		Expiration: 5 * time.Second,
 		ErrCallback: func(err error, r *http.Request) {
 			log.Printf("%s: %v\n", r.URL.EscapedPath(), err)
 		},
@@ -42,7 +43,6 @@ func main() {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// a perfect example of something you shouldn't cache :)
 		fmt.Fprintf(w, "hello %s, the time is %v", r.RemoteAddr, time.Now())
-
 	})
-	log.Fatalln(http.ListenAndServe(":8180", cache.Middleware(mux, cachecfg)))
+	log.Fatalln(http.ListenAndServe(":8180", servertiming.Middleware(cache.Middleware(mux, cachecfg), nil)))
 }
